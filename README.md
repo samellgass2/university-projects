@@ -1,5 +1,5 @@
 # university-projects
-### All projects done through classes or during my time at the University of California, Berkeley.
+### All projects done in (2019 - 2023) at the University of California, Berkeley.
 - **Call-Me-Ace-Internship**
   * While working as the *Product Marketing Intern* for Rapper *Call Me Ace*, I oversaw the marketing rollout of his album release *Out of Office*, worked to organize a team of interns to analyze and create social media content, and worked as a **campaign analyst for the BET AmpliFind Competition** during March-April 2021. Currently, Ace is a finalist, and most of the work that I've done has been collecting data and working to draw insights from it to employ in our tactics.
 - **LinkedIn-consulting-project**
