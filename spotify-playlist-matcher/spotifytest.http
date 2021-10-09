@@ -1,5 +1,5 @@
 # AUTHENTICATION
-#GET https://accounts.spotify.com/authorize?client_id=2b90b67f37914c32ad094916156f44aa&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%2F~samuelellgass%2F
+GET https://accounts.spotify.com/authorize?client_id=2b90b67f37914c32ad094916156f44aa&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%2F~samuelellgass%2F
 
 
 # Pieces:

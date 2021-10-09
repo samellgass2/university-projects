@@ -3,11 +3,13 @@ import time
 import spotipy
 import pandas as pd
 from spotipy.oauth2 import SpotifyOAuth
+import playlistmatch.playlistmatch as pm
 
 app = Flask(__name__)
 app.secret_key = "VERYSECRET3892093029543042"
 app.config['SESSION_COOKIE_NAME'] = 'User Cookie'
 TOKEN_INFO = "Token here"
+MODEL = "no model yet initialized"
 
 
 def create_oauth():
@@ -74,23 +76,37 @@ def processuserdata():
     """
     token_info = get_token()
     access = spotipy.Spotify(auth=token_info['access_token'])
-    allplaylists = access.current_user_playlists(limit=10, offset=0)['items']
-    USERID = access.me()['id']
+    allplaylists = []
+
+    # return str(access.current_user_playlists(limit=50, offset=1000)['next'])
+
+    someplaylists = access.current_user_playlists(limit=50, offset=0)
+    allplaylists.extend(someplaylists['items'])
+    # Continue processing playlists until no more exist
+    index = 1
+    while someplaylists['next']:
+        someplaylists = access.current_user_playlists(limit=50, offset=index*50)
+        allplaylists.extend(someplaylists['items'])
+        index+=1
+
+    Userid = access.me()['id']
+
     allpackages = []
     for playlist in allplaylists:
-        if playlist['owner']['id']==USERID:
+        if playlist['owner']['id']==Userid:
             pid = playlist['id']
+            # use playlist ID as the key and store all song ID's in tuples = packages
             packagedplaylist = parse_playlist(pid, access)
-            allpackages.append(packagedplaylist)
+            if packagedplaylist != "Empty":
+                allpackages.append(packagedplaylist)
         # if it's NOT THE USER'S PLAYLIST, do nothing.
 
-        # use playlist ID as the key and store all song ID's in tuples = packages
+    # MODULE 2 BEGINS HERE
+    playlistmodel = pm.DataPipeline(allpackages)
 
-    # Once finished, pass this along to playlistparser to transform song data into arrays of pertinent data
 
-    # Here the meat of the program will be run, i.e. Module 2, by passing this
-
-    return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + 'total songs'
+    # Then eventually return results
+    return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + ' total songs and built model with ' + str(len(playlistmodel.pids)) + ' known pids'
 
 
 # TO DO - BUILD OUT FUNCTIONALITY FOR 100+ VIA FOR LOOP STYLE REQUESTS
@@ -100,12 +116,15 @@ def parse_playlist(pid, access, numsongs=100):
     :param pid: a spotify playlistid (string)
     :param access: a spotipy.Spotify object with authorization access
     :param numsongs: the number of songs to consider from the playlist
-    :return: a tuple of (pid, pd.DataFrame of track content)
+    :return: a list of [pid, pd.DataFrame of track content]
     """
     trackframe = []
     thetracks = access.playlist_tracks(playlist_id=pid, limit=numsongs, offset=0)
     trackuris = [track['track']['uri'] for track in thetracks['items']]
-    trackframe = pd.DataFrame(access.audio_features(trackuris))
-    trackframe.to_csv('PLAYLIST DATA FOR PID='+pid)
-    return (pid, trackframe)
+    trackfeats = access.audio_features(trackuris)
+    if None in trackfeats:
+        return "Empty"
+    else:
+        trackframe = pd.DataFrame(trackfeats)
+    return [pid, trackframe]
 
