@@ -1,15 +1,17 @@
-from flask import Flask, request, url_for, session, redirect
+from flask import Flask, request, url_for, session, redirect, render_template
 import time
 import spotipy
 import pandas as pd
 from spotipy.oauth2 import SpotifyOAuth
 import playlistmatch.playlistmatch as pm
+import jsonpickle
 
 app = Flask(__name__)
 app.secret_key = "VERYSECRET3892093029543042"
 app.config['SESSION_COOKIE_NAME'] = 'User Cookie'
 TOKEN_INFO = "Token here"
 MODEL = "no model yet initialized"
+PIDTONAME = "nothing yet"
 
 
 def create_oauth():
@@ -65,6 +67,12 @@ def redirectPage():
     code = request.args.get('code')
     token_info = oauth.get_access_token(code)
     session[TOKEN_INFO] = token_info
+    return redirect(url_for('loadingscreen', _external=True))
+
+@app.route('/loadingscreen')
+def loadingscreen():
+    # TO DO: MAKE THIS ACTUALLY LOAD
+    render_template('loadingscreen.html')
     return redirect(url_for('processuserdata', _external=True))
 
 
@@ -91,6 +99,8 @@ def processuserdata():
 
     Userid = access.me()['id']
 
+    # TO DO: STORE ALL PLAYLIST NAMES IN THE SAME ORDER IN A MAPPING FROM PID TO NAME
+    pidtoname = {}
     allpackages = []
     for playlist in allplaylists:
         if playlist['owner']['id']==Userid:
@@ -99,15 +109,21 @@ def processuserdata():
             packagedplaylist = parse_playlist(pid, access)
             if packagedplaylist != "Empty":
                 allpackages.append(packagedplaylist)
+                pidtoname[pid]=playlist['name']
         # if it's NOT THE USER'S PLAYLIST, do nothing.
 
     # MODULE 2 BEGINS HERE
-    playlistmodel = pm.DataPipeline(allpackages)
+    session[PIDTONAME] = pidtoname
+    frozenmodel = jsonpickle.encode(pm.DataPipeline(allpackages))
+    session[MODEL] = frozenmodel
 
 
-    # Then eventually return results
+    # Once model is generated, REDIRECT to a page
+    # that allows the user to put in a song & get it added
+    # PASS ARGUMENT TO RETURN AND ADD
+    return render_template('index.html')
     return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + ' total songs and built model with ' + str(len(playlistmodel.pids)) + ' known pids'
-
+    # THIS RETURN WILL REDIRECT
 
 # TO DO - BUILD OUT FUNCTIONALITY FOR 100+ VIA FOR LOOP STYLE REQUESTS
 def parse_playlist(pid, access, numsongs=100):
@@ -118,7 +134,6 @@ def parse_playlist(pid, access, numsongs=100):
     :param numsongs: the number of songs to consider from the playlist
     :return: a list of [pid, pd.DataFrame of track content]
     """
-    trackframe = []
     thetracks = access.playlist_tracks(playlist_id=pid, limit=numsongs, offset=0)
     trackuris = [track['track']['uri'] for track in thetracks['items']]
     trackfeats = access.audio_features(trackuris)
@@ -128,3 +143,29 @@ def parse_playlist(pid, access, numsongs=100):
         trackframe = pd.DataFrame(trackfeats)
     return [pid, trackframe]
 
+@app.route('/predictandadd')
+def predictandadd():
+    token_info = get_token()
+    access = spotipy.Spotify(auth=token_info['access_token'])
+    trackstr = request.args.get('trackurl')
+    num = request.args.get('num')
+    frozenmodel = session.get(MODEL)
+    model = jsonpickle.decode(frozenmodel)
+    pidtoname = session.get(PIDTONAME)
+
+    trackdict = access.audio_features([trackstr])[0]
+    predictions = model.predict(trackdict, num)
+    # For each returned pid, map to name using pidtoname.get(pid)
+
+    packages = []
+    for i in range(len(predictions)):
+        package = {}
+        package['name'] = pidtoname[predictions[i][0]]
+        package['confidence'] = predictions[i][1]
+        packages.append(package)
+
+
+    # for each returned pid, display whether or not the song already exists on that playlist
+    return render_template('predictandadd.html', packages=packages)
+    #access.playlist_add_items('track_uri')
+    # This return will eventually be return render_template('predictandadd.html')

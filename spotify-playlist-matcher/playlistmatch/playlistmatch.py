@@ -1,6 +1,7 @@
 from sklearn.linear_model import LogisticRegression
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
 
 
 class DataPipeline:
@@ -16,6 +17,7 @@ class DataPipeline:
         self.process()
         self.X = None
         self.Y = None
+
 
     def process(self):
         """
@@ -53,6 +55,10 @@ class DataPipeline:
         X = (X - X.mean()) / X.std()
         return X, y
 
+    def calc_confidence(self, std, mean, val):
+        zscore = (val-mean) / std
+        return norm.cdf(zscore)
+
     def process_track(self, rawtrack):
         """
         Turn "track
@@ -74,19 +80,22 @@ class DataPipeline:
         Given a dictionary of audio_features for a track, processes the track, performs classification, and returns the num_results best playlist ids
         :param rawtrack: A dictionary of audio_features for a track
         :param num_results: Integer, number of playlists to return
-        :return:
+        :return: A 2d list, where every entry is [pid, confidence] in descending order of match
         """
         trackarr = self.process_track(rawtrack)
         # Because it expects multiple, single classification requires an index
         results = self.model.predict_proba(trackarr)[0]
-        idsofinterest = []
+        bestplaylists = []
+        std = np.std(results)
+        mean = np.mean(results)
         for i in np.arange(num_results):
             ind = np.argmax(results)
-            idsofinterest.append(self.pids[ind])
+            conf = self.calc_confidence(std, mean, results[ind])
+            bestplaylists.append([self.pids[ind], conf])
             # Remove the maximum from the pool, then continue
             results[ind] = -1
 
-        return idsofinterest
+        return bestplaylists
 
 
 
