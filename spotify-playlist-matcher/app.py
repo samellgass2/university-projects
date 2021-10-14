@@ -96,7 +96,7 @@ def processuserdata():
 
     # Once model is generated, REDIRECT to a page
     # that allows the user to put in a song & get it added
-    return render_template('index.html')
+    return render_template('landing.html')
     # return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + ' total songs and built model with ' + str(len(playlistmodel.pids)) + ' known pids'
     # THIS RETURN WILL REDIRECT
 
