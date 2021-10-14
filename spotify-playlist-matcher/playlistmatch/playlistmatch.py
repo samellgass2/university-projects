@@ -1,4 +1,4 @@
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -37,7 +37,7 @@ class DataPipeline:
         self.data = pd.concat(allplaylists)
         # From this point on, SELF.X, and SELF.Y correspond to training data for the model
         self.X, self.Y = self.dataprocess()
-        self.model = LogisticRegression(C=2, multi_class='multinomial', max_iter=500)
+        self.model = RandomForestClassifier(n_estimators=100, criterion="gini", max_depth=10, class_weight='balanced_subsample' )
         self.model.fit(self.X, self.Y)
 
     def dataprocess(self):
@@ -57,7 +57,7 @@ class DataPipeline:
 
     def calc_confidence(self, std, mean, val):
         zscore = (val-mean) / std
-        return norm.cdf(zscore)
+        return norm.cdf(zscore) * 100
 
     def process_track(self, rawtrack):
         """

@@ -8,7 +8,7 @@
             <h2>{{ package['name'] }}</h2>
             <p> This playlist was a {{ package['confidence'] }} % match.</p>
             <button class="button">
-                <a href="#href">Add to Playlist</a>
+                <a href= "{{ url_for('addtoplaylist', pid=package['pid']) }}">Add to Playlist</a>
                 <!-- FIX THIS LINK TO GO TO THE FUNCTION TO DO IT -->
             </button>
         </ul>

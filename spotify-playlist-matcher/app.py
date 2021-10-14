@@ -12,6 +12,7 @@ app.config['SESSION_COOKIE_NAME'] = 'User Cookie'
 TOKEN_INFO = "Token here"
 MODEL = "no model yet initialized"
 PIDTONAME = "nothing yet"
+CURRENTTRACKID = "none"
 
 
 def create_oauth():
@@ -84,45 +85,19 @@ def processuserdata():
     """
     token_info = get_token()
     access = spotipy.Spotify(auth=token_info['access_token'])
-    allplaylists = []
 
     # return str(access.current_user_playlists(limit=50, offset=1000)['next'])
 
-    someplaylists = access.current_user_playlists(limit=50, offset=0)
-    allplaylists.extend(someplaylists['items'])
-    # Continue processing playlists until no more exist
-    index = 1
-    while someplaylists['next']:
-        someplaylists = access.current_user_playlists(limit=50, offset=index*50)
-        allplaylists.extend(someplaylists['items'])
-        index+=1
-
-    Userid = access.me()['id']
-
-    # TO DO: STORE ALL PLAYLIST NAMES IN THE SAME ORDER IN A MAPPING FROM PID TO NAME
-    pidtoname = {}
-    allpackages = []
-    for playlist in allplaylists:
-        if playlist['owner']['id']==Userid:
-            pid = playlist['id']
-            # use playlist ID as the key and store all song ID's in tuples = packages
-            packagedplaylist = parse_playlist(pid, access)
-            if packagedplaylist != "Empty":
-                allpackages.append(packagedplaylist)
-                pidtoname[pid]=playlist['name']
-        # if it's NOT THE USER'S PLAYLIST, do nothing.
-
     # MODULE 2 BEGINS HERE
-    session[PIDTONAME] = pidtoname
-    frozenmodel = jsonpickle.encode(pm.DataPipeline(allpackages))
-    session[MODEL] = frozenmodel
+    # session[PIDTONAME] = pidtoname
+    # frozenmodel = jsonpickle.encode(pm.DataPipeline(allpackages))
+    # session[MODEL] = frozenmodel
 
 
     # Once model is generated, REDIRECT to a page
     # that allows the user to put in a song & get it added
-    # PASS ARGUMENT TO RETURN AND ADD
     return render_template('index.html')
-    return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + ' total songs and built model with ' + str(len(playlistmodel.pids)) + ' known pids'
+    # return 'Successfully processed ' + str(len(allpackages)) + ' playlists, with ' + str(sum([p[1].shape[0] for p in allpackages])) + ' total songs and built model with ' + str(len(playlistmodel.pids)) + ' known pids'
     # THIS RETURN WILL REDIRECT
 
 # TO DO - BUILD OUT FUNCTIONALITY FOR 100+ VIA FOR LOOP STYLE REQUESTS
@@ -147,11 +122,44 @@ def parse_playlist(pid, access, numsongs=100):
 def predictandadd():
     token_info = get_token()
     access = spotipy.Spotify(auth=token_info['access_token'])
+
+    # MODULE 2 WORK MOVED HERE
+    allplaylists = []
+    someplaylists = access.current_user_playlists(limit=50, offset=0)
+    allplaylists.extend(someplaylists['items'])
+    # Continue processing playlists until no more exist
+    index = 1
+    while someplaylists['next'] and index <= 1:
+        someplaylists = access.current_user_playlists(limit=50, offset=index * 50)
+        allplaylists.extend(someplaylists['items'])
+        index += 1
+
+    Userid = access.me()['id']
+
+    # TO DO: STORE ALL PLAYLIST NAMES IN THE SAME ORDER IN A MAPPING FROM PID TO NAME
+    pidtoname = {}
+    allpackages = []
+    for playlist in allplaylists:
+        if playlist['owner']['id'] == Userid:
+            pid = playlist['id']
+            # use playlist ID as the key and store all song ID's in tuples = packages
+            packagedplaylist = parse_playlist(pid, access)
+            if packagedplaylist != "Empty":
+                allpackages.append(packagedplaylist)
+                pidtoname[pid] = playlist['name']
+
+        # if it's NOT THE USER'S PLAYLIST, do nothing.
+
+    # MODULE 2 WORK MOVED HERE
+
+    model = pm.DataPipeline(allpackages)
+
     trackstr = request.args.get('trackurl')
-    num = request.args.get('num')
-    frozenmodel = session.get(MODEL)
-    model = jsonpickle.decode(frozenmodel)
-    pidtoname = session.get(PIDTONAME)
+    session[CURRENTTRACKID] = trackstr
+    num = int(request.args.get('num'))
+    # frozenmodel = session.get(MODEL)
+    # model = jsonpickle.decode(frozenmodel)
+    # pidtoname = session.get(PIDTONAME)
 
     trackdict = access.audio_features([trackstr])[0]
     predictions = model.predict(trackdict, num)
@@ -162,6 +170,7 @@ def predictandadd():
         package = {}
         package['name'] = pidtoname[predictions[i][0]]
         package['confidence'] = predictions[i][1]
+        package['pid'] = predictions[i][0]
         packages.append(package)
 
 
@@ -169,3 +178,11 @@ def predictandadd():
     return render_template('predictandadd.html', packages=packages)
     #access.playlist_add_items('track_uri')
     # This return will eventually be return render_template('predictandadd.html')
+
+@app.route('/addtoplaylist')
+def addtoplaylist():
+    token_info = get_token()
+    access = spotipy.Spotify(auth=token_info['access_token'])
+    pid = request.args.get('pid')
+    access.playlist_add_items(pid, [session.get(CURRENTTRACKID)])
+    return render_template('successfullyadded.html')
